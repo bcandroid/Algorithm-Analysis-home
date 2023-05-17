@@ -1,271 +1,401 @@
-/******************************************************************************
 
+//BUSRA CALISKAN 504211507
 
-*******************************************************************************/
 #include <iostream>
-#include <vector>
-#include <cmath>
-#include <queue>
-#include <bits/stdc++.h>
-#include <string> 
-#include <chrono>
-#include <ctime>
 #include <fstream>
+#include <sstream>
+#include <string>
+#include <map>
+#include <vector>
+#include <algorithm>
+#include <utility>
+#include <cmath>
+#include <math.h>
 using namespace std;
-
-struct Node {
-    public:
-        int x, y, p; //x ,y and p are x-coordinates,y-coordinates and strength of kids
-        
+//it is used for dates and times of str 
+struct Interval {
+    string start;
+    string end;
 };
-class Graph{ 
-    private:
-        int V; //num of kids
-    public:
-        
-        Graph(int); //constructor
-        bool visited[1000]; //keeping visited nodes
-        int parent[1000]; // save parents of nodes for dfs
-        vector<list<int>>graph; //adcany list
-        vector<vector<int>> adj_matrix; //adjancy matrix
-        string str_dfs=""; //saving path for dfs
-        list<int> dic; //saving path for dfs before and after source
-        bool dfs(int, int,int); //recursively DFS algorithm and it return whether cycle is or not
-        void addEdge(int,int); //creating graph
-        string BFS(int,int); //returning BFS path and BFS algoritm
-        string find_cycle(int ); //save last path DFS after recursively searching
-        void print_adjMatrix(); //for print adj_matrix
-        void print_vector_list(vector<list<int>>); //for print adj lists
+//it is used for salons which has capacity and list of end and begin times
+struct Salon {
+    vector<Interval> times;
+    int capacity;
 };
-//find distannce of two nodes
-int distance(Node a, Node b) {
-    return pow(a.x - b.x, 2) + pow(a.y - b.y, 2);
-}
-void file_adj(vector<vector<int>>);
-void file_bfs(string );
-void file_dfs(string);
+//it is used for places which has salons and list of end and begin dates 
+struct Place {
+    vector<Interval> dates;
+    map<string, Salon> salons;
+};
+//it is used for kruskal and WIS. I created vector has Weighted str type
+struct Weighted {
+    string starto; //start date or time
+    string endo; //end date or time
+    int capacito; // capacity as rules
+    string name; //name
+};
+//it is used just for assets.txt
+struct Asset {
+    string name;
+    int price;
+    double value;
+};
+//it keeps Place name and its Revenue.
+struct Rules {
+    std::map<string, int> values;
 
-int main(int argc, char* argv[])
-
-{
-    system("clear");
-    //auto start = chrono::steady_clock::now();
-    vector<vector<int>>matrix; 
-    int source; //source kid
-    int target; //taget kid
-    int n; //kids number
-    ifstream file("./graphs/case2/input_2.txt");//argv[1] "./graphs/case9/input_9.txt"
-    // Read the file line by line
-    string line;
-    file>>n>>source>>target ;
-    for(int i = 0; i< n; ++i){
-        int k,l,m;
-        vector<int>row;
-        file>>k>>l>>m;
-        row.insert(row.begin(),k);
-        row.insert(row.begin()+1,l);
-        row.insert(row.begin()+2,m);
-        matrix.push_back(row);
-        
-    }    
-    file.close();
-    Graph g(n);//create Graph g
-    vector<Node>not_real=vector<Node>(n);//temporary vector saving kids nodes
-    for (int i = 0; i < n; i++) {
-        not_real[i].x=matrix[i][0];
-        not_real[i].y=matrix[i][1];
-        not_real[i].p=matrix[i][2];
-    }
-    
-    //adding nodes and connect them in graph
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < n; j++) {
-            if (i == j){
-                continue;
-            }
+    int getValue(const string& name) {
+        if (values.count(name) > 0) {
+            return values[name];
+        } else {
             
-            if (distance(not_real[i],not_real[j]) <= not_real[i].p && distance(not_real[i],not_real[j]) <= not_real[j].p){
-                        g.addEdge(i, j);
-            }
-            
+            return -1;
         }
     }
-   
-    file_adj(g.adj_matrix); //create adjancy matrix on txt file
-    string str=g.BFS(source,target);
-    cout<<str<<endl;
-    file_bfs(str); //create BFS txt
-    string s=g.find_cycle(source); 
-    //auto finish = chrono::steady_clock::now(); //end of time to calculate runtime
-    file_dfs(s); //create DFS file
-    cout<<s<<endl;
-     //double elapsed_seconds =chrono::duration_cast<chrono::duration<double> >(finish - start).count();  
-    //cout<<elapsed_seconds<<endl;
+};
+Rules rules;
+
+map<string, Place> places;//it keeps all schedules which has all places and its salons
+//it make string time to int time which i used compare as their times
+int timeToMinutes(string& times) {
+    stringstream ss(times);
+  int hours, minutes;
+  char separator;
+  ss >> hours >> separator >> minutes;
+  int total_minutes = hours * 60 + minutes;
+    return total_minutes;
+}
+//it make string dates to int dates which i used compare as their dates
+int dateToDays(string& dates) {
+    stringstream ss(dates);
+  int months, days;
+  char separator;
+  ss >> days >> separator >> months;
+  int total;
+  if(months==4||months==6||months==9||months==11){
+    total= months * 30 + days;
+  }
+  if(months==1||months==3||months==5||months==7||months==8||months==10){
+    total= months * 31 + days;
+  }
+  if(months==2){
+    total= months * 28 + days;
+  }
+    return total;
+}
+//compare end times for best for eachplace
+bool myfunction1(Weighted& s1, Weighted& s2)
+{
+    return (timeToMinutes(s1.endo) < timeToMinutes(s2.endo));
+}
+//compare end dates for best tour
+bool myfunction2(Weighted& s1, Weighted& s2)
+{
+    return(dateToDays(s1.endo)< dateToDays(s2.endo));
+}
+//return string of months
+string getMonthName(int month) {
+    string monthNames[] = {"January", "February", "March", "April", "May", "June",
+                           "July", "August", "September", "October", "November", "December"};
+    return monthNames[month - 1];
+}
+//change month as desired view
+string monthtrans(string& a){
+    stringstream ss(a);
+    int months, days;
+    char separator;
+    ss >> days >> separator >> months;
+    string s=to_string(days)+" "+getMonthName(months);
+    return s;
+}
+//for availability_intervals.txt ,here we create places and their dates and keep as map
+void parse_availability_intervals(string filename) {
+    ifstream input(filename);
+    string line;
+    getline(input, line); // skip first line
+    while (getline(input, line)) {
+        stringstream ss(line);
+        string place_name, start, end;
+        ss >> place_name >> start >> end;
+        Interval interval = { start, end };
+        Place& place = places[place_name];
+        place.dates.push_back(interval);
+    }
+    input.close();
+}
+//for daily_schedule.txt ,here we create salons and their times and keep as map and put belonging places already created
+void parse_daily_schedule(string filename) {
+    ifstream input(filename);
+    string line;
+    getline(input, line); // skip first line
+    while (getline(input, line)) {
+        stringstream ss(line);
+        string place_name,salon_name, start, end;
+        ss >>place_name>> salon_name >> start >> end;
+        Interval interval = {start, end};
+        Salon& salon = places[place_name].salons[salon_name];
+        salon.times.push_back(interval);
+    }
+    input.close();
+}
+//for capacity.txt, here we put capacity of salons
+void parse_capacity(string filename) {
+    ifstream input(filename);
+    string line;
+    getline(input, line); // skip first line
+    while (getline(input, line)) {
+        stringstream ss(line);
+        string place_name,salon_name, cap;
+        ss >> place_name>>salon_name >> cap;
+        Salon& salon = places[place_name].salons[salon_name];
+        salon.capacity = stoi(cap);
+    }
+    input.close();
+}
+//for assets.txt, here we create vector assest 
+vector<Asset> readAssetsFromFile(string filename) {
+    vector<Asset> assets;
+    ifstream file(filename);
+    if (file.is_open()) {
+        string line;
+        getline(file, line); // Skip the header line
+
+        while (getline(file, line)) {
+            istringstream iss(line);
+            Asset asset;
+            iss >> asset.name >> asset.price >> asset.value;
+            assets.push_back(asset);
+        }
+
+        file.close();
+    } else {
+        cout << "Failed to open the file: " << filename << std::endl;
+    }
+
+    return assets;
+}
+//printing map<string, Place> places keeps all schedules which has all places and its salons
+void printing(map<string, Place>& pl){
+    for(auto a:pl){
+        cout<<a.first<<endl;
+        for(auto b:a.second.salons){
+            cout<<"\t"<<b.first<<" ";
+            cout<<b.second.capacity<<endl;
+            for(auto c:b.second.times){
+                cout<<"\t\t"<<c.start<< " "<<c.end<<endl;
+            }
+        }
+    } 
+    for(auto a:pl){
+        cout<<a.first<<endl;
+        for(auto b:a.second.dates){
+            cout<<"\t"<<b.start<<" "<<b.end;
+        }
+        cout<<endl;
+    }
+}
+//for best each place , we create WIS
+void WIS1(map<string, Salon>& sal,vector<Weighted>& result,int& t){
+    
+    vector<Weighted> jobs; //create vector for using WIS and put and keep weighted str which has start end capacity and name of salons
+    for (auto s : sal) {
+        for (auto a:s.second.times) {
+            Weighted i;
+            i.starto=a.start;
+            i.endo=a.end;
+            i.name=s.first;
+            i.capacito=s.second.capacity;
+            jobs.push_back(i);
+        }
+    }
+    sort(jobs.begin(),jobs.end(),myfunction1); //sort vector as their end times
+    int n = jobs.size();
+    if (n == 0) {
+        return;
+    }
+    vector<int> tasks[n];//n-1.vector of task keeps desired WIS path
+    int maxProfit[n];//it keeps all max profit
+    for (int i = 0; i < n; i++)
+    {
+        maxProfit[i] = 0; //first profit is 0
+        for (int j = 0; j < i; j++)
+        {
+            // update i.salon if the j. salon is non-conflicting and leading to max profit
+            if (timeToMinutes(jobs[j].endo) <= timeToMinutes(jobs[i].starto) && maxProfit[i] < maxProfit[j])
+            {
+                tasks[i] = tasks[j];
+                maxProfit[i] = maxProfit[j];
+            }
+        }
+        // current task with i.salon
+        tasks[i].push_back(i);
+        maxProfit[i] += jobs[i].capacito;
+    }
+    // find an index with the maximum profit
+    int index = 0;
+    for (int i = 1; i < n; i++)
+    {
+        if (maxProfit[i] > maxProfit[index]) {
+            index = i;
+        }
+    }
+    //put infos and return result
+    for (int i: tasks[index])
+    {
+        t=t+jobs[i].capacito; //calculate Revenue
+        Weighted n;
+        n.name=jobs[i].name;
+        n.starto=jobs[i].starto;
+        n.endo= jobs[i].endo;
+        n.capacito= jobs[i].capacito;
+        result.push_back(n);
+    }
+}
+//knapsack algo
+pair<float, vector<string>> knapsack(vector<Asset>& assets, int totalValue) {
+    int n = assets.size();
+    vector<vector<float>> dp(n + 1, std::vector<float>(totalValue + 1, 0.0));
+
+    for (int i = 1; i <= n; ++i) {
+        for (int j = 0; j <= totalValue; ++j) {
+            if (assets[i - 1].price <= j) {
+                dp[i][j] = max(dp[i - 1][j], static_cast<float>(assets[i - 1].value + dp[i - 1][j - assets[i - 1].price]));
+            } else {
+                dp[i][j] = dp[i - 1][j];
+            }
+        }
+    }
+
+    vector<string> selectedAssets;
+    int j = totalValue;
+    float maxValue = dp[n][totalValue];
+    for (int i = n; i > 0 && j > 0; --i) {
+        if (dp[i][j] != dp[i - 1][j]) {
+            selectedAssets.push_back(assets[i - 1].name);
+            maxValue =maxValue- assets[i - 1].value;
+            j =j- assets[i - 1].price;
+        }
+    }
+
+    return {dp[n][totalValue], selectedAssets};
+}
+//WIS FOR BEST TOUR
+vector<int> y;
+//FIND NONOVERLAP ELEMENT
+int nonover2(int j,vector<Weighted>&b){
+    for(int i=j-1;i>=0;i--){
+        if(dateToDays(b[i].endo)<=dateToDays(b[j].starto)){
+            return i;
+        }
+    }
+    return -1;
+}
+//COMPUTE OPTİIMAL
+int Compute_Opt2(int j,vector<Weighted>&b){
+    if(j<0){
+        return 0;
+    }
+    else if(y[j]==0){
+       
+        y[j]=max(b[j].capacito+Compute_Opt2(nonover2(j,b),b),Compute_Opt2(j-1,b));
+    }
+    return y[j];
+}
+//FIND PATH
+int Find_Solution2(int j,vector<Weighted>&b,vector<Weighted>&results){
+    if(j<0){
+        return 0;
+    }
+    else if(b[j].capacito+Compute_Opt2(nonover2(j,b),b)>Compute_Opt2(j-1,b)){
+        results.push_back(b[j]);
+        return Find_Solution2(nonover2(j,b),b,results);
+        
+    }
+    return Find_Solution2(j-1,b,results);
+    
+}
+pair<int, vector<Weighted>> WIS2(map<string, Place>& sal){
+    vector<Weighted> jobs; 
+    
+    for (auto s : sal) {
+        for (auto a:s.second.dates) {
+            Weighted i;
+            i.starto=a.start;
+            i.endo=a.end;
+            i.name=s.first;
+            int diff=dateToDays(a.end)-dateToDays(a.start);//calculate diff of days
+            i.capacito=diff*rules.getValue(s.first); //calculate each revenue
+            jobs.emplace_back(i);
+            y.push_back(0);
+        }
+    }
+    y.push_back(0);
+    sort(jobs.begin(),jobs.end(),myfunction2);
+    
+    int n = jobs.size();
+    
+    vector<Weighted> result;
+    
+    Compute_Opt2(n- 1, jobs);
+    Find_Solution2(n-1,jobs,result);
+
+    reverse(result.begin(), result.end());
+
+    return { y[n - 1], result };
+}
+void creating(string s, string n) {
+    fstream filename;
+    filename.open(s, ios::out);
+    filename << n;
+    filename.close();
+}
+int main(int argc, char* argv[]) {
+    string caseNo = "1";
+    if(argc == 2){
+        caseNo = argv[1];
+    }
+    string input_path = "/inputs/" + caseNo + "/";
+    string e=input_path + "daily_schedule.txt";
+    string b=input_path + "capacity.txt";
+    string c=input_path + "availability_intervals.txt";
+    string d=input_path + "assets.txt";
+    parse_availability_intervals(c);
+    parse_daily_schedule(e);
+    parse_capacity(b);
+    vector<Asset> assets = readAssetsFromFile(b);
+    //printing(places);
+    string s1="";
+    for(auto a:places){
+        s1=s1+a.first+"-->";
+        int t=0;
+        vector<Weighted> s; 
+        WIS1(a.second.salons,s,t);
+        s1+=to_string(t)+"\n";
+        rules.values[a.first]=t;
+        for(auto b:s){
+            s1+=a.first+"\t\t"+b.name+"\t" + b.starto + "\t" + b.endo + "\n";
+        }
+        s1+="\n";
+    }
+    
+    auto [optValue, s] = WIS2(places);
+    string s2="";
+    s2+= "Total Revenue −−> " + to_string(optValue) + "\n";
+    for(auto b:s){
+        s2+=b.name+"\t" + monthtrans(b.starto) + "\t" + monthtrans(b.endo) + "\n";
+    }
+    string s3="";
+    auto [ch, selectedAssets] = knapsack(assets, optValue);
+    s3+= "Total Value --> " + to_string(ch) + "\n";
+    for (const std::string& asset : selectedAssets) {
+        s3+= asset + "\n";
+    }
+    string bestForEachPlace = "/outputs/" + caseNo+"/"+"best_for_eachplace.txt";
+    string bestTour = "/outputs/" + caseNo+"/"+"best_tour.txt";
+    string upgradeList ="/outputs/" + caseNo+"/"+"upgrade_list.txt";
+    creating(bestForEachPlace,s1);
+    creating(bestTour,s2);
+    creating(upgradeList,s3);
+    
     return 0;
 }
-Graph::Graph(int b)
-{
-    this->V = b;
-    adj_matrix.resize(b, vector<int>(b));
-    for (unsigned int i = 0; i < adj_matrix.size(); i++)
-    {
-        for (unsigned int j = 0; j < adj_matrix[i].size(); j++)
-        {
-            adj_matrix[i][j]=0;
-        }    
-        
-    }
-    graph.resize(b+1);
-    
-}
-//if conditions are okey ,adding nodes
-void Graph::addEdge(int u, int v)
-{
-    graph[u].push_back(v);
-    adj_matrix[u][v]=1;
-}
-
-string Graph::BFS(int source, int target) {
-    
-    int distance[V+ 5]; //to calculte steps
-    int nparent[V + 5]; //saving parent of nodes
-    bool visit[V + 5]; //keep visit info
-    queue<int> q; //BFS path
-    q.push(source); // push source
-    visit[source] = true;
-    distance[source] = 0;
-    while (!q.empty()) { //until q is empty
-        int u = q.front(); //pop first element of queue
-        q.pop();
-        for (auto adj : graph[u]) { //looking for u.list of Graph
-            
-            if (!visit[adj]) { //if not visited
-                visit[adj] = true; // visit is true
-                distance[adj] = distance[u] + 1; //update current distance from u
-                nparent[adj] = u; // record parent of v as u
-                q.push(adj); //push current for path
-            }
-        }
-        if (u == target) { //if u is target break
-            break;
-        }
-    }
-    //savig path as a string
-    string h="";
-    h=h+to_string(distance[target])+" ";
-    vector<int> path; 
-    int current = target;
-    while (current != source) {
-        path.push_back(current);
-        current = nparent[current];
-    }
-    path.push_back(source);
-    for (int i = path.size() - 1; i > 0; i--) {
-        h=h+to_string(path[i])+"->";
-    }
-    h=h+to_string(path[0]);
-    return h;
-}
-
-string Graph::find_cycle(int source) {
-    visited[source] = true; //source is visited and its parent is nothing
-    parent[source] = -1;
-    auto i=graph[source].front(); //take first node of source. list
-        
-    if (dfs(i, source,source)) { //for first time control bool recursive DFS for source
-            str_dfs=to_string(dic.size()+1)+" "+to_string(source)+"->";//if there is arrange path
-            for(auto a: dic)
-                str_dfs=str_dfs+to_string(a)+"->";
-            str_dfs=str_dfs+to_string(source);    
-    }
-    else{//if there is no cycle , print -1
-            str_dfs="-1";
-    }
-    
-    return str_dfs;
-}
-
-bool Graph::dfs(int node, int source,int p) {
-    visited[node] = true; 
-    parent[node] = p; //saving p as parent of node
-    dic.push_back(node); //push node 
-    //if current is neighbour with source and distance is bigger than 2, return true
-    if(dic.size()>1&&adj_matrix[node][source]==1){
-                return true;
-    }
-    //looking for node neighbour list
-    for (auto i : graph[node]) {
-        if (!visited[i]) { //if not visted
-            if (dfs(i, source,node)) { //and if there is DFS with current and node, return true
-                return true;
-                
-            }
-        } 
-        
-        if (parent[i] == source&& dic.size()>1) { //if parent of current is source and distance bigger than 2,return true
-                return true;
-        }
-    }
-    dic.pop_back(); //adding node is not suitable , pop_back
-    return false;//return false 
-}
-void file_adj(vector<vector<int>>mat){
-    ofstream adj("./graph.txt");
-    adj<<"Graph:"<<endl;
-    if(adj.is_open()){
-        for(auto vec:mat){
-            for(auto elem:vec){
-                adj<<elem<<" ";
-            }
-            adj<<endl;
-        }
-        adj.close();
-    }
-    
-    return;
-}
-void file_bfs(string s){
-    ofstream jbfs("./bfs.txt");
-    if(jbfs.is_open()){
-        jbfs<<"BFS:"<<endl;
-        jbfs<<s;
-        
-    }
-    return;
-}
-void file_dfs(string s){
-    ofstream jdfs("./dfs.txt");
-    if(jdfs.is_open()){
-        jdfs<<"DFS:"<<endl;
-       
-        jdfs<<s;
-        
-    }
-    return;
-}
-    
-    
- //for print adj list
-void Graph::print_vector_list(vector<list<int>> gr){
-    list<int>::iterator it;
-    for (auto adjacent : gr) {
-        adjacent.sort();
-        for (it=adjacent.begin(); it!=adjacent.end(); ++it){
-            cout << ' ' << *it;
-            
-        }
-        cout << endl;
-    }
-}
-//for print adjancy matrix
-void Graph::print_adjMatrix(){
-    int n=adj_matrix.size();
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < n; j++) {
-            cout << adj_matrix[i][j] << " ";
-        }
-        cout << endl;
-    }    
-    
-}   
-    
